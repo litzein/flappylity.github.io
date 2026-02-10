@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Walter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    background: linear-gradient(#70c5ce, #c2f0f7);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<audio id="jumpSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="hitSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+const jumpSound = document.getElementById("jumpSound");
+const hitSound = document.getElementById("hitSound");
+
+let gravity = 0.45;
+let jump = -8;
+let velocity = 0;
+
+let score = 0;
+let highScore = localStorage.getItem("heisenbergHigh") || 0;
+let gameOver = false;
+let frame = 0;
+
+let walter = {
+  x: canvas.width * 0.25,
+  y: canvas.height / 2,
+  r: 22
+};
+
+let obstacles = [];
+
+function drawWalter() {
+  // kafa
+  ctx.beginPath();
+  ctx.arc(walter.x, walter.y, walter.r, 0, Math.PI * 2);
+  ctx.fillStyle = "#f1c27d";
+  ctx.fill();
+
+  // şapka
+  ctx.fillStyle = "#000";
+  ctx.fillRect(walter.x - 25, walter.y - 30, 50, 10);
+  ctx.fillRect(walter.x - 15, walter.y - 50, 30, 20);
+
+  // gözlük
+  ctx.strokeStyle = "#000";
+  ctx.strokeRect(walter.x - 15, walter.y - 5, 12, 8);
+  ctx.strokeRect(walter.x + 3, walter.y - 5, 12, 8);
+  ctx.beginPath();
+  ctx.moveTo(walter.x - 3, walter.y);
+  ctx.lineTo(walter.x + 3, walter.y);
+  ctx.stroke();
+
+  // sakal
+  ctx.beginPath();
+  ctx.arc(walter.x, walter.y + 10, 10, 0, Math.PI);
+  ctx.stroke();
+}
+
+function difficultyColor() {
+  if (score < 10) return "#8efcff";     // kolay
+  if (score < 20) return "#2ecc71";     // orta
+  return "#9b59b6";                     // zor
+}
+
+function speed() {
+  if (score < 10) return 2.2;
+  if (score < 20) return 2.8;
+  return 3.4;
+}
+
+function addObstacle() {
+  let gap = canvas.height * 0.25;
+  let top = Math.random() * (canvas.height * 0.4) + 50;
+  obstacles.push({
+    x: canvas.width,
+    top,
+    bottom: top + gap,
+    passed: false
+  });
+}
+
+function drawMeth(x, y, w, h) {
+  ctx.fillStyle = difficultyColor();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y + 10);
+  ctx.lineTo(x + w - 10, y + h);
+  ctx.lineTo(x + 10, y + h - 10);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function updateObstacles() {
+  obstacles.forEach(o => {
+    o.x -= speed();
+
+    if (!o.passed && o.x + 50 < walter.x) {
+      score++;
+      o.passed = true;
+    }
+
+    if (
+      walter.x + walter.r > o.x &&
+      walter.x - walter.r < o.x + 50 &&
+      (walter.y - walter.r < o.top ||
+       walter.y + walter.r > o.bottom)
+    ) {
+      endGame();
+    }
+  });
+
+  if (obstacles.length && obstacles[0].x + 50 < 0) {
+    obstacles.shift();
+  }
+}
+
+function drawUI() {
+  ctx.fillStyle = "#000";
+  ctx.font = "26px Arial";
+  ctx.fillText("Skor: " + score, 20, 40);
+  ctx.fillText("High: " + highScore, 20, 70);
+}
+
+function endGame() {
+  hitSound.play();
+  gameOver = true;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("heisenbergHigh", highScore);
+  }
+}
+
+function update() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameOver) {
+    ctx.fillStyle = "red";
+    ctx.font = "48px Arial";
+    ctx.fillText("GAME OVER", canvas.width/2 - 140, canvas.height/2);
+    ctx.font = "24px Arial";
+    ctx.fillText("Dokun / Space", canvas.width/2 - 90, canvas.height/2 + 40);
+    return;
+  }
+
+  velocity += gravity;
+  walter.y += velocity;
+
+  if (walter.y + walter.r > canvas.height || walter.y < 0) {
+    endGame();
+  }
+
+  if (frame % 120 === 0) addObstacle();
+
+  obstacles.forEach(o => {
+    drawMeth(o.x, 0, 50, o.top);
+    drawMeth(o.x, o.bottom, 50, canvas.height);
+  });
+
+  updateObstacles();
+  drawWalter();
+  drawUI();
+
+  frame++;
+  requestAnimationFrame(update);
+}
+
+function flap() {
+  if (gameOver) {
+    location.reload();
+    return;
+  }
+  velocity = jump;
+  jumpSound.currentTime = 0;
+  jumpSound.play();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") flap();
+});
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  flap();
+});
+
+update();
+</script>
+</body>
+</html>
